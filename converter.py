@@ -156,27 +156,28 @@ def test_conversion(latex_input):
     print(f"Преобразованный обратно LaTeX: {latex_output}")
     print("-" * 50)
 
-# Список тестовых случаев
-test_cases = [
-    r'a + b - c',
-    r'\vec{A} + \vec{B} = \vec{C}',
-    r'\boldsymbol{F} = m \boldsymbol{a}',
-    r'E = mc^2',
-    r'\vec{F} = G \frac{m_1 m_2}{r^2} \hat{r}',
-    r'\nabla \cdot \vec{E} = \frac{\rho}{\varepsilon_0}',
-    r'\nabla \times \vec{B} = \mu_0 \vec{J} + \mu_0 \varepsilon_0 \frac{\partial \vec{E}}{\partial t}',
-    r'W = \vec{F} \cdot \vec{s}',
-    r'\vec{p} = m \vec{v}',
-    r'\vec{L} = \vec{r} \times \vec{p}',
-    r'V = IR',
-    r'\varepsilon = -\frac{d\Phi}{dt}',
-    r'E = \frac{1}{4\pi\varepsilon_0} \frac{q}{r^2}',
-    r'\Phi = \int \vec{E} \cdot d\vec{A}',
-    r'\Delta x \Delta p \geq \frac{\hbar}{2}',
-    r'S = \int L \, dt',
-    r'\lambda = \frac{h}{p}'
-]
+if __name__ == "__main__":
+    # Список тестовых случаев
+    test_cases = [
+        r'a + b - c',
+        r'\vec{A} + \vec{B} = \vec{C}',
+        r'\boldsymbol{F} = m \boldsymbol{a}',
+        r'E = mc^2',
+        r'\vec{F} = G \frac{m_1 m_2}{r^2} \hat{r}',
+        r'\nabla \cdot \vec{E} = \frac{\rho}{\varepsilon_0}',
+        r'\nabla \times \vec{B} = \mu_0 \vec{J} + \mu_0 \varepsilon_0 \frac{\partial \vec{E}}{\partial t}',
+        r'W = \vec{F} \cdot \vec{s}',
+        r'\vec{p} = m \vec{v}',
+        r'\vec{L} = \vec{r} \times \vec{p}',
+        r'V = IR',
+        r'\varepsilon = -\frac{d\Phi}{dt}',
+        r'E = \frac{1}{4\pi\varepsilon_0} \frac{q}{r^2}',
+        r'\Phi = \int \vec{E} \cdot d\vec{A}',
+        r'\Delta x \Delta p \geq \frac{\hbar}{2}',
+        r'S = \int L \, dt',
+        r'\lambda = \frac{h}{p}'
+    ]
 
-# Выполняем тестирование
-for latex_input in test_cases:
-    test_conversion(latex_input)
+    # Выполняем тестирование
+    for latex_input in test_cases:
+        test_conversion(latex_input)
