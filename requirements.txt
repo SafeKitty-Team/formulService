@@ -1,1 +1,1 @@
-sympy
+pylatexenc
