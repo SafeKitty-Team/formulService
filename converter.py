@@ -1,13 +1,14 @@
+# Импорт необходимых модулей
 from sympy.parsing.latex import parse_latex
 from sympy import (
-    latex, sympify, Symbol, Integer, Float, Rational,
-    Pow, Add, Mul, sqrt, log, sin, cos, tan,
-    Integral, Derivative, Limit, Sum, Function, S, symbols
+    Symbol, Integer, Float, Rational, Pow, Add, Mul, sqrt, log, sin, cos, tan,
+    Integral, Derivative, Limit, Sum, Function, pi, E, oo, exp, symbols, Abs
 )
-from sympy.core.relational import Relational
-from sympy.functions.elementary.trigonometric import TrigonometricFunction
+from sympy.core.relational import Relational, Eq, Ne, Lt, Gt, Le, Ge
+from sympy.functions.elementary.trigonometric import TrigonometricFunction, InverseTrigonometricFunction
 from sympy.functions.elementary.hyperbolic import HyperbolicFunction
-from sympy.functions.elementary.exponential import exp
+from sympy.core.numbers import NegativeOne
+from sympy.functions.special.delta_functions import DiracDelta
 
 def ast_to_latex(ast):
     """
@@ -18,6 +19,8 @@ def ast_to_latex(ast):
     :return: Строка LaTeX.
     """
     node_type = ast.get('type')
+    if node_type is None:
+        raise ValueError("AST не содержит тип узла.")
 
     if node_type == 'fraction':
         # Обработка дроби
@@ -57,15 +60,25 @@ def ast_to_latex(ast):
         index = ast_to_latex(ast['index'])
         return f"\\sqrt[{index}]{{{radicand}}}"
     elif node_type == 'function':
-        # Обработка функций (тригонометрических, логарифмических и т.д.)
+        # Обработка функций
         func_name = ast['name']
-        arguments = ast.get('arguments', [])
-        if arguments:
-            args_latex = ', '.join([ast_to_latex(arg) for arg in arguments])
-            return f"\\{func_name}({args_latex})"
-        else:
+        if func_name in ['sin', 'cos', 'tan', 'csc', 'sec', 'cot']:
+            # Тригонометрические функции
             argument = ast_to_latex(ast['argument'])
             return f"\\{func_name}{{{argument}}}"
+        elif func_name in ['asin', 'acos', 'atan', 'acot', 'acsc', 'asec']:
+            # Обратные тригонометрические функции
+            argument = ast_to_latex(ast['argument'])
+            base_func = func_name[1:]  # Убираем 'a' из названия функции
+            return f"\\{base_func}^{{-1}}{{{argument}}}"
+        else:
+            # Обработка остальных функций
+            if 'arguments' in ast:
+                arguments = ', '.join([ast_to_latex(arg) for arg in ast['arguments']])
+                return f"\\{func_name}({arguments})"
+            else:
+                argument = ast_to_latex(ast['argument'])
+                return f"\\{func_name}{{{argument}}}"
     elif node_type == 'negative':
         # Обработка отрицательных чисел или выражений
         operand = ast_to_latex(ast['operand'])
@@ -86,8 +99,8 @@ def ast_to_latex(ast):
     elif node_type == 'log':
         # Обработка логарифмов
         argument = ast_to_latex(ast['argument'])
-        base = ast_to_latex(ast['base']) if 'base' in ast else ''
-        if base:
+        if 'base' in ast:
+            base = ast_to_latex(ast['base'])
             return f"\\log_{{{base}}}{{{argument}}}"
         else:
             return f"\\ln{{{argument}}}"
@@ -131,11 +144,34 @@ def ast_to_latex(ast):
         upper_limit = ast_to_latex(ast['upper_limit'])
         return f"\\sum_{{{variable}={lower_limit}}}^{{{upper_limit}}} {expression}"
     elif node_type == 'equation':
-        # Обработка уравнений
+        # Обработка уравнений и неравенств
         lhs = ast_to_latex(ast['lhs'])
         rhs = ast_to_latex(ast['rhs'])
         operator = ast.get('operator', '=')
-        return f"{lhs} {operator} {rhs}"
+        operator_latex = {
+            '==': '=',
+            '!=': '\\ne',
+            '<': '<',
+            '>': '>',
+            '<=': '\\leq',
+            '>=': '\\geq',
+            'approx': '\\approx'
+        }.get(operator, operator)
+        return f"{lhs} {operator_latex} {rhs}"
+    elif node_type == 'constant':
+        # Обработка констант
+        name = ast['name']
+        if name == 'infty':
+            return r"\infty"
+        elif name == 'pi':
+            return r"\pi"
+        elif name == 'e':
+            return r"e"
+        else:
+            return name
+    elif node_type == 'unknown':
+        # Обработка неизвестных узлов
+        return ast['value']
     else:
         # Если тип узла неизвестен
         raise ValueError(f"Неизвестный тип узла AST: {node_type}")
@@ -161,7 +197,18 @@ def sympy_expr_to_ast(expr):
     :param expr: Выражение SymPy.
     :return: Словарь, представляющий AST.
     """
-    if isinstance(expr, Integer):
+    if expr == oo:
+        # Обработка бесконечности
+        return {"type": "constant", "name": "infty"}
+    elif expr == -oo:
+        return {"type": "negative", "operand": {"type": "constant", "name": "infty"}}
+    elif expr == pi:
+        # Обработка числа пи
+        return {"type": "constant", "name": "pi"}
+    elif expr == E:
+        # Обработка числа e
+        return {"type": "constant", "name": "e"}
+    elif isinstance(expr, Integer):
         # Обработка целых чисел
         if expr < 0:
             return {
@@ -180,8 +227,12 @@ def sympy_expr_to_ast(expr):
         else:
             return {"type": "float", "value": float(expr)}
     elif isinstance(expr, Symbol):
-        # Обработка переменных
-        return {"type": "variable", "name": str(expr)}
+        # Обработка переменных, включая греческие буквы
+        name = str(expr)
+        if name in ['theta', 'phi', 'alpha', 'beta', 'gamma', 'delta', 'epsilon', 'lambda', 'mu', 'nu', 'omega']:
+            return {"type": "variable", "name": f"\\{name}"}
+        else:
+            return {"type": "variable", "name": name}
     elif isinstance(expr, Add):
         # Обработка сложения и вычитания
         operands = []
@@ -203,13 +254,20 @@ def sympy_expr_to_ast(expr):
         operands += [sympy_expr_to_ast(factor) for factor in factors]
         return {"type": "multiplication", "operands": operands}
     elif isinstance(expr, Pow):
-        # Обработка возведения в степень
         base, exponent = expr.args
-        return {
-            "type": "power",
-            "base": sympy_expr_to_ast(base),
-            "exponent": sympy_expr_to_ast(exponent)
-        }
+        if exponent.is_Rational and exponent.q != 1 and exponent.p == 1:
+            # Обработка корня n-й степени
+            return {
+                "type": "nth_root",
+                "radicand": sympy_expr_to_ast(base),
+                "index": sympy_expr_to_ast(Integer(exponent.q))
+            }
+        else:
+            return {
+                "type": "power",
+                "base": sympy_expr_to_ast(base),
+                "exponent": sympy_expr_to_ast(exponent)
+            }
     elif isinstance(expr, Rational):
         # Обработка рациональных чисел (дробей)
         numerator = sympy_expr_to_ast(expr.p)
@@ -221,6 +279,15 @@ def sympy_expr_to_ast(expr):
         }
     elif isinstance(expr, TrigonometricFunction):
         # Обработка тригонометрических функций
+        func_name = expr.func.__name__.lower()
+        argument = sympy_expr_to_ast(expr.args[0])
+        return {
+            "type": "function",
+            "name": func_name,
+            "argument": argument
+        }
+    elif isinstance(expr, InverseTrigonometricFunction):
+        # Обработка обратных тригонометрических функций
         func_name = expr.func.__name__.lower()
         argument = sympy_expr_to_ast(expr.args[0])
         return {
@@ -289,8 +356,12 @@ def sympy_expr_to_ast(expr):
         # Обработка производных
         function = sympy_expr_to_ast(expr.expr)
         variables = expr.variables
-        variable = sympy_expr_to_ast(variables[0][0]) if isinstance(variables[0], tuple) else sympy_expr_to_ast(variables[0])
-        order = variables[0][1] if isinstance(variables[0], tuple) else 1
+        if isinstance(variables[0], tuple):
+            variable = sympy_expr_to_ast(variables[0][0])
+            order = variables[0][1]
+        else:
+            variable = sympy_expr_to_ast(variables[0])
+            order = 1
         return {
             "type": "derivative",
             "function": function,
@@ -302,7 +373,7 @@ def sympy_expr_to_ast(expr):
         expression = sympy_expr_to_ast(expr.args[0])
         variable = sympy_expr_to_ast(expr.args[1])
         value = sympy_expr_to_ast(expr.args[2])
-        direction = expr.direction
+        direction = expr.args[3] if len(expr.args) > 3 else ''
         return {
             "type": "limit",
             "expression": expression,
@@ -338,9 +409,9 @@ def sympy_expr_to_ast(expr):
         # Обработка экспоненциальной функции
         exponent = sympy_expr_to_ast(expr.args[0])
         return {
-            "type": "function",
-            "name": "exp",
-            "argument": exponent
+            "type": "power",
+            "base": {"type": "constant", "name": "e"},
+            "exponent": exponent
         }
     elif isinstance(expr, Function):
         # Обработка пользовательских функций
@@ -351,6 +422,71 @@ def sympy_expr_to_ast(expr):
             "name": func_name,
             "arguments": arguments
         }
+    elif isinstance(expr, Abs):
+        # Обработка модуля
+        argument = sympy_expr_to_ast(expr.args[0])
+        return {
+            "type": "function",
+            "name": "left|",
+            "argument": argument
+        }
     else:
         # Если тип выражения неизвестен
         return {"type": "unknown", "value": str(expr)}
+
+if __name__ == "__main__":
+    def test_conversion(latex_input):
+        print(f"Тестируем LaTeX ввод: {latex_input}")
+        # Преобразуем LaTeX в AST
+        ast = latex_to_ast(latex_input)
+        if 'error' in ast:
+            print(f"Ошибка при парсинге LaTeX: {ast['error']}")
+            print("-" * 50)
+            return
+        print("AST:")
+        print(ast)
+        # Преобразуем AST обратно в LaTeX
+        try:
+            latex_output = ast_to_latex(ast)
+        except ValueError as e:
+            print(f"Ошибка при преобразовании AST в LaTeX: {e}")
+            print("-" * 50)
+            return
+        print(f"Преобразованный обратно LaTeX: {latex_output}")
+        # Проверяем эквивалентность входного и выходного LaTeX
+        try:
+            expr_input = parse_latex(latex_input)
+            expr_output = parse_latex(latex_output)
+            if expr_input.equals(expr_output):
+                print("Успех: Выражения эквивалентны.")
+            else:
+                print("Предупреждение: Выражения не эквивалентны.")
+        except Exception as e:
+            print(f"Ошибка при сравнении выражений: {e}")
+        print("-" * 50)
+
+    # Список тестовых случаев
+    test_cases = [
+        'a + b - c',
+        r'\frac{a \cdot b}{c}',
+        r'\sqrt[n]{a^2 + b^2}',
+        r'\sin(\theta) + \cos(\phi)',
+        r'\log_{a}(b)',
+        r'\int_{0}^{\infty} e^{-x} \, dx',
+        r'E = mc^2',
+        '-5',
+        '3.14',
+        r'\tan^{-1}(x)',
+        r'\frac{\partial f}{\partial x}',
+        r'\sum_{n=1}^{\infty} \frac{1}{n^2}',
+        r'\lim_{x \to 0} \frac{\sin x}{x}',
+        r'\int \frac{1}{x} \, dx = \ln|x| + C',
+        r'f(x) = \begin{cases} x^2, & x \geq 0 \\ -x, & x < 0 \end{cases}',
+        r'\det(A) = \sum_{\sigma \in S_n} (\operatorname{sgn} \sigma) \prod_{i=1}^n a_{i,\sigma(i)}',
+        r'\int_{a}^{b} f(x) \, dx \approx \sum_{i=1}^{n} f(x_i) \Delta x',
+        r'\frac{d^2 y}{dx^2} + \omega^2 y = 0'
+    ]
+
+    # Выполняем тестирование
+    for latex_input in test_cases:
+        test_conversion(latex_input)
