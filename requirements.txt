@@ -1,1 +1,9 @@
 pylatexenc
+nltk
+sympy
+torch
+opencv-python
+pillow
+torchvision
+transformers
+numpy
