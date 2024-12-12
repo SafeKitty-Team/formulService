@@ -1,19 +1,11 @@
 import sympy
-from sympy import simplify, Symbol, log, exp, pi
+from sympy import simplify, Symbol, Eq
 from sympy.parsing.latex import parse_latex
 from sympy.core.relational import Relational
 
 def replace_symbols_with_assumptions(expr, assumptions, shared_symbols):
     """
     Заменяет символы в выражении на новые символы с заданными предположениями.
-
-    Параметры:
-    - expr: Выражение SymPy.
-    - assumptions: Словарь предположений для переменных (например, {'x': {'positive': True}}).
-    - shared_symbols: Словарь для хранения общих символов.
-
-    Возвращает:
-    - Новое выражение SymPy с заменёнными символами.
     """
     if not assumptions:
         return expr
@@ -26,12 +18,9 @@ def replace_symbols_with_assumptions(expr, assumptions, shared_symbols):
                 new_name = f"{s.name}_assume"
                 new_s = Symbol(new_name, **assumptions[s.name])
                 shared_symbols[s.name] = new_s
-                print(f"Создание нового символа: {new_name} с предположениями {assumptions[s.name]}")
             else:
                 new_s = shared_symbols[s.name]
             replacements[s] = new_s
-            print(f"Замена символа: {s} на {new_s}")
-
     # Заменяем все символы с помощью subs
     expr = expr.subs(replacements)
     return expr
@@ -42,18 +31,19 @@ def compare_formulas_sympy(formula1: str, formula2: str, assumptions=None) -> (b
     Возвращает:
     - Эквивалентны ли они
     - Процент сходства на основе коэффициента Жаккара
-
-    Параметры:
-    - formula1: Первая формула в LaTeX.
-    - formula2: Вторая формула в LaTeX.
-    - assumptions: Словарь предположений для переменных (например, {'x': {'positive': True}}). Может быть None.
     """
     try:
-        # Парсим формулы без предположений
+        # Парсим формулы
         expr1 = parse_latex(formula1)
         expr2 = parse_latex(formula2)
     except Exception as e:
         raise ValueError(f"Ошибка при парсинге формул: {e}")
+
+    # Преобразуем равенства в выражения (приводим к виду expr = 0)
+    if isinstance(expr1, Relational):
+        expr1 = expr1.lhs - expr1.rhs
+    if isinstance(expr2, Relational):
+        expr2 = expr2.lhs - expr2.rhs
 
     # Создаём общий словарь для символов с предположениями
     shared_symbols = {}
@@ -69,9 +59,6 @@ def compare_formulas_sympy(formula1: str, formula2: str, assumptions=None) -> (b
     simplified2 = simplify(simplified2)
 
     # Для отладки: выводим упрощённые выражения
-    print(f"Упрощённая Формула 1: {simplified1}")
-    print(f"Упрощённая Формула 2: {simplified2}")
-
     # Проверяем эквивалентность
     equivalent = simplified1.equals(simplified2)
 
@@ -93,16 +80,9 @@ def compare_formulas_sympy(formula1: str, formula2: str, assumptions=None) -> (b
 
     return equivalent, similarity
 
-
 def get_subexpressions(expr: sympy.Expr) -> set:
     """
     Получает все подвыражения из выражения SymPy.
-
-    Параметры:
-    - expr: Выражение SymPy.
-
-    Возвращает:
-    - Множество строковых представлений подвыражений.
     """
     subexprs = set()
     for sub in sympy.preorder_traversal(expr):
@@ -111,3 +91,22 @@ def get_subexpressions(expr: sympy.Expr) -> set:
             continue
         subexprs.add(sympy.srepr(sub))  # Используем srepr для хешируемого представления
     return subexprs
+
+# Пример использования
+if __name__ == "__main__":
+    formula1 = "a \\left( -b + \\sqrt{ -4 a c + b^{2} } \\right) / 2"
+    formula2 = "x = a \\left( -b + \\sqrt{ -4 a c + b^{2} } \\right) / 2"
+
+    # Предположения, если необходимы
+    assumptions = {
+        'a': {'real': True},
+        'b': {'real': True},
+        'c': {'real': True},
+        'x': {'real': True}
+    }
+
+    try:
+        equivalent, similarity = compare_formulas_sympy(formula1, formula2, assumptions)
+        print(f"Эквивалентны: {equivalent}, Сходство: {similarity:.2f}%")
+    except ValueError as e:
+        print(f"Ошибка при сравнении формул ID 6: {e}")
