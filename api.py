@@ -3,16 +3,15 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Any, Union
+from typing import List, Optional, Dict, Any, Union, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
 import logging
+import sympy
 
-# Импортируем функции и модели из converter.py и analysis.py
-from converter import ast2latex, ASTNode
-from index import compare_formulas_sympy
-
-# Импортируем функции и модели из db.py
+# Импортируем функции и модели
+from converter import ast2latex
+from index import compare_formulas_sympy  # Предполагается, что compare_formulas_sympy возвращает расширенные данные
 from db import (
     create_formula,
     update_formula,
@@ -25,25 +24,25 @@ from db import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Инициализация FastAPI приложения
 app = FastAPI(
     title="LaTeX AST Converter API",
     description="API для преобразования LaTeX формул в AST и обратно, управления формулами и поиска похожих формул",
     version="1.0.0"
 )
 
-# Pydantic модели
 
 class LatexFormula(BaseModel):
     formula: str
     userid: int
     action: str  # 'create', 'update', 'delete'
     formula_id: Optional[int] = None  # Необходимо для update и delete
-    legend: Optional[str] = None  # Необходимо для create и update
-    description: Optional[str] = None  # Необходимо для create и update
+    legend: Optional[str] = None      # Необходимо для create и update
+    description: Optional[str] = None # Необходимо для create и update
+
 
 class AnalysisResult(BaseModel):
     result: str
+
 
 class FormulaResponse(BaseModel):
     id: int
@@ -54,50 +53,51 @@ class FormulaResponse(BaseModel):
     creation_date: Optional[str] = None
     update_date: Optional[str] = None
 
-class SimilarFormulaResponse(BaseModel):
-    formula: FormulaResponse
-    similarity: float
 
 class FindSimilarRequest(BaseModel):
     formula: str
 
+
 class ASTToLatexRequest(BaseModel):
-    ast: List[Dict[str, Any]]  # Изменено: теперь ast является списком словарей
+    ast: List[Dict[str, Any]]
+
 
 class LatexResponse(BaseModel):
     latex: str
 
-class ASTResponse(BaseModel):
-    ast: List[Dict[str, Any]]  # Изменено при необходимости
 
-# Эндпоинты
+class ASTResponse(BaseModel):
+    ast: List[Dict[str, Any]]
+
+
+class CommonSubexpressionInfo(BaseModel):
+    subexpression: str
+    indices_in_expr2: List[int]
+    occurrences_in_simplified2: List[Tuple[int, int]]
+
+
+class DetailedSimilarityInfo(BaseModel):
+    formula: FormulaResponse
+    equivalent: bool
+    similarity: float
+    simplified1: str
+    simplified2: str
+    common_subexpressions: List[CommonSubexpressionInfo]
+
 
 @app.post("/convert_ast_to_latex", response_model=LatexResponse)
 def convert_ast_to_latex_endpoint(request: ASTToLatexRequest):
-    """
-    Принимает AST формулу в формате JSON, преобразует её в LaTeX и возвращает.
-    Ожидаемый формат:
-    {
-        "ast": [
-            {"type": "node_type_1", "value": "value1", ...},
-            {"type": "node_type_2", "value": "value2", ...},
-            ...
-        ]
-    }
-    """
     try:
-        ast_nodes = request.ast  # Получаем список словарей
-        latex_str = ast2latex(ast_nodes)  # Передаем список словарей в ast2latex
+        ast_nodes = request.ast
+        latex_str = ast2latex(ast_nodes)
         return {"latex": latex_str}
     except Exception as e:
         logger.error(f"Ошибка при конвертации AST в LaTeX: {e}")
         raise HTTPException(status_code=400, detail=f"Ошибка при конвертации AST в LaTeX: {e}")
 
+
 @app.post("/manage_formula")
 def manage_formula(latex_formula: LatexFormula, db: Session = Depends(get_db)):
-    """
-    Сохраняет, обновляет или удаляет LaTeX формулу в базе данных.
-    """
     formula = latex_formula.formula
     userid = latex_formula.userid
     action = latex_formula.action.lower()
@@ -106,7 +106,6 @@ def manage_formula(latex_formula: LatexFormula, db: Session = Depends(get_db)):
     description = latex_formula.description
 
     if action == "create":
-        # При создании формулы formula_id игнорируется
         if not legend or not description:
             raise HTTPException(status_code=400, detail="legend и description обязательны для создания формулы.")
         try:
@@ -123,7 +122,6 @@ def manage_formula(latex_formula: LatexFormula, db: Session = Depends(get_db)):
             raise HTTPException(status_code=500, detail=f"Ошибка при создании формулы: {e}")
 
     elif action == "update":
-        # Для обновления формулы formula_id обязателен
         if not formula_id:
             raise HTTPException(status_code=400, detail="formula_id обязателен для обновления.")
         try:
@@ -141,7 +139,6 @@ def manage_formula(latex_formula: LatexFormula, db: Session = Depends(get_db)):
             raise HTTPException(status_code=500, detail=f"Ошибка при обновлении формулы: {e}")
 
     elif action == "delete":
-        # Для удаления формулы formula_id обязателен
         if not formula_id:
             raise HTTPException(status_code=400, detail="formula_id обязателен для удаления.")
         try:
@@ -152,21 +149,17 @@ def manage_formula(latex_formula: LatexFormula, db: Session = Depends(get_db)):
         except SQLAlchemyError as e:
             logger.error(f"Ошибка при удалении формулы: {e}")
             raise HTTPException(status_code=500, detail=f"Ошибка при удалении формулы: {e}")
-
     else:
         raise HTTPException(status_code=400, detail="Неверное действие. Допустимые действия: create, update, delete.")
 
 
 @app.get("/formulas", response_model=List[FormulaResponse])
 def get_all_formulas_endpoint(db: Session = Depends(get_db)):
-    """
-    Получает все формулы из базы данных.
-    """
     try:
         all_formulas = get_all_formulas(db)
         if not all_formulas:
             return []
-        all_formulas_response = [
+        return [
             FormulaResponse(
                 id=formula.id,
                 latex_formula=formula.latex_formula,
@@ -178,61 +171,75 @@ def get_all_formulas_endpoint(db: Session = Depends(get_db)):
             )
             for formula in all_formulas
         ]
-        return all_formulas_response
     except SQLAlchemyError as e:
         logger.error(f"Ошибка при получении формул: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка при получении формул: {e}")
 
-@app.post("/find_similar", response_model=List[SimilarFormulaResponse])
+
+@app.post("/find_similar", response_model=List[DetailedSimilarityInfo])
 def find_similar_formulas(request: FindSimilarRequest, db: Session = Depends(get_db)):
-    """
-    Принимает LaTeX формулу, сравнивает её со всеми формулами в базе данных и возвращает топ-10 похожих формул.
-    """
     input_formula = request.formula
-    assumptions = None  # Убираем передачу предположений
+    assumptions = None
 
     try:
-        # Получаем все формулы из базы данных
         all_formulas = get_all_formulas(db)
         if not all_formulas:
             return []
 
-        similarities = []
-
+        results = []
         for formula in all_formulas:
             try:
-                # Сравниваем только поля формулы
-                equivalent, similarity = compare_formulas_sympy(
+                (equivalent,
+                 similarity,
+                 common_subexpressions,
+                 common_indices_in_expr2,
+                 substring_occurrences_in_simplified2,
+                 simplified1,
+                 simplified2) = compare_formulas_sympy(
                     formula1=input_formula,
                     formula2=formula.latex_formula,
-                    assumptions=assumptions  # Передаём None
+                    assumptions=assumptions
                 )
-                similarities.append({
-                    "formula": FormulaResponse(
-                        id=formula.id,
-                        latex_formula=formula.latex_formula,
-                        author_id=formula.author_id,
-                        legend=formula.legend,
-                        description=formula.description,
-                        creation_date=formula.creation_date.strftime("%Y-%m-%d %H:%M:%S") if formula.creation_date else None,
-                        update_date=formula.update_date.strftime("%Y-%m-%d %H:%M:%S") if formula.update_date else None
-                    ),
-                    "similarity": similarity
-                })
+
+                # Формируем список CommonSubexpressionInfo
+                common_info_list = []
+                for subexpr in common_subexpressions:
+                    common_info_list.append(CommonSubexpressionInfo(
+                        subexpression=subexpr,
+                        indices_in_expr2=common_indices_in_expr2[subexpr],
+                        occurrences_in_simplified2=substring_occurrences_in_simplified2[subexpr]
+                    ))
+
+                results.append(
+                    DetailedSimilarityInfo(
+                        formula=FormulaResponse(
+                            id=formula.id,
+                            latex_formula=formula.latex_formula,
+                            author_id=formula.author_id,
+                            legend=formula.legend,
+                            description=formula.description,
+                            creation_date=formula.creation_date.strftime("%Y-%m-%d %H:%M:%S") if formula.creation_date else None,
+                            update_date=formula.update_date.strftime("%Y-%m-%d %H:%M:%S") if formula.update_date else None
+                        ),
+                        equivalent=equivalent,
+                        similarity=similarity,
+                        simplified1=sympy.latex(simplified1),
+                        simplified2=sympy.latex(simplified2),
+                        common_subexpressions=common_info_list
+                    )
+                )
             except Exception as e:
-                # Логируем ошибку и продолжаем с другими формулами
                 logger.error(f"Ошибка при сравнении формул ID {formula.id}: {e}")
                 continue
 
-        # Сортируем по убыванию сходства и выбираем топ-10
-        top_similar = sorted(similarities, key=lambda x: x["similarity"], reverse=True)[:10]
+        # Сортируем по сходству
+        results = sorted(results, key=lambda x: x.similarity, reverse=True)[:10]
+        return results
 
-        return top_similar
     except Exception as e:
         logger.error(f"Ошибка при поиске похожих формул: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка при поиске похожих формул: {e}")
 
-# Пример запуска приложения (если вы запускаете этот скрипт напрямую)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
