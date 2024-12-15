@@ -33,7 +33,6 @@ function FormulaList() {
       setError(null);
       const data = await getAllFormulas();
       
-      // Проверяем, что данные это массив и имеют правильную структуру
       if (Array.isArray(data)) {
         const validData = data.filter(item => 
           item && 
@@ -225,9 +224,9 @@ function FormulaList() {
                       </div>
                     </div>
                     {f.description && (
-                      <p className="text-slate-600 dark:text-slate-300 mb-4">
+                      <div className="text-slate-600 dark:text-slate-300 mb-4 whitespace-pre-line">
                         {f.description}
-                      </p>
+                      </div>
                     )}
                     <div className="flex justify-end space-x-2">
                       <Button
