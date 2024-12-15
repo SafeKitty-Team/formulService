@@ -1,3 +1,6 @@
 __pycache__
 myvenv
 pycache
+frontend/node_modules
+backend/output_docs
+realese_version/output_docs

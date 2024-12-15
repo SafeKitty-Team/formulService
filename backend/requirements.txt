@@ -1,0 +1,10 @@
+pylatexenc
+sympy
+antlr4-python3-runtime==4.11
+sqlalchemy 
+psycopg2-binary
+fastapi
+python-docx 
+matplotlib
+uuid
+tqdm

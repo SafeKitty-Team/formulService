@@ -3,11 +3,19 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
+from fastapi.staticfiles import StaticFiles
 from typing import List, Optional, Dict, Any, Union, Tuple
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import SQLAlchemyError
+from fastapi.responses import FileResponse
 import logging
 import sympy
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import UploadFile, File
+from jscon2pdf import json_to_docx
+import os
+
+os.makedirs("output_docs", exist_ok=True)
 
 # Импортируем функции и модели
 from converter import ast2latex
@@ -30,6 +38,14 @@ app = FastAPI(
     version="1.0.0"
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 class LatexFormula(BaseModel):
     formula: str
@@ -38,6 +54,15 @@ class LatexFormula(BaseModel):
     formula_id: Optional[int] = None  # Необходимо для update и delete
     legend: Optional[str] = None      # Необходимо для create и update
     description: Optional[str] = None # Необходимо для create и update
+
+class FormulaData(BaseModel):
+    id: int
+    latex_formula: str
+    author_id: int
+    legend: Optional[str]
+    description: Optional[str]
+    creation_date: Optional[str]
+    update_date: Optional[str]
 
 
 class AnalysisResult(BaseModel):
@@ -85,6 +110,7 @@ class DetailedSimilarityInfo(BaseModel):
     common_subexpressions: List[CommonSubexpressionInfo]
 
 
+
 @app.post("/convert_ast_to_latex", response_model=LatexResponse)
 def convert_ast_to_latex_endpoint(request: ASTToLatexRequest):
     try:
@@ -94,6 +120,34 @@ def convert_ast_to_latex_endpoint(request: ASTToLatexRequest):
     except Exception as e:
         logger.error(f"Ошибка при конвертации AST в LaTeX: {e}")
         raise HTTPException(status_code=400, detail=f"Ошибка при конвертации AST в LaTeX: {e}")
+
+OUTPUT_DIRECTORY = "output_docs"
+
+app.mount("/output_docs", StaticFiles(directory=OUTPUT_DIRECTORY), name="output_docs")
+
+
+@app.post("/convert_to_docx")
+def convert_to_docx_endpoint(data: List[FormulaData]):
+    """
+    Конвертирует JSON в DOCX и возвращает ссылку на файл.
+    """
+    try:
+        # Преобразование Pydantic-моделей в список словарей
+        data_dict = [item.dict() for item in data]
+        
+        # Вызов функции для создания DOCX
+        file_path = json_to_docx(data_dict, OUTPUT_DIRECTORY)
+        
+        # Формирование ссылки для скачивания
+        file_name = os.path.basename(file_path)
+        file_url = f"http://localhost:8000/output_docs/{file_name}"
+        logger.info(f"Файл успешно создан: {file_url}")
+        return {"status": "success", "file_url": file_url}
+    except Exception as e:
+        logger.error(f"Ошибка при создании DOCX: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 
 @app.post("/manage_formula")
@@ -116,6 +170,7 @@ def manage_formula(latex_formula: LatexFormula, db: Session = Depends(get_db)):
                 legend=legend,
                 description=description
             )
+            print(new_formula)
             return {"status": "success", "message": "Формула создана.", "formula_id": new_formula.id}
         except SQLAlchemyError as e:
             logger.error(f"Ошибка при создании формулы: {e}")
@@ -179,6 +234,7 @@ def get_all_formulas_endpoint(db: Session = Depends(get_db)):
 @app.post("/find_similar", response_model=List[DetailedSimilarityInfo])
 def find_similar_formulas(request: FindSimilarRequest, db: Session = Depends(get_db)):
     input_formula = request.formula
+    print(input_formula)
     assumptions = None
 
     try:
@@ -240,6 +296,13 @@ def find_similar_formulas(request: FindSimilarRequest, db: Session = Depends(get
         logger.error(f"Ошибка при поиске похожих формул: {e}")
         raise HTTPException(status_code=500, detail=f"Ошибка при поиске похожих формул: {e}")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# Используется в релиз версии
+
+# app.mount("/static", StaticFiles(directory="static"), name="static")
+#
+# @app.get("/{full_path:path}")
+# async def serve_react(full_path: str):
+#     # Для API эндпоинтов
+#     if full_path.startswith("api/"):
+#         return {"message": "This is API endpoint"}
+#     return FileResponse('index.html')

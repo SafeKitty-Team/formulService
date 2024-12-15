@@ -1,0 +1,179 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+ 
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+ 
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 min-h-screen;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Стили для математических формул */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 1rem 0;
+  margin: 0 !important;
+}
+
+.katex {
+  text-rendering: auto;
+  font-size: 1.1em !important;
+}
+
+/* Стили для редактора формул */
+.math-keyboard {
+  background-color: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 1rem 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.math-keyboard button {
+  margin: 0.25rem;
+  padding: 0.5rem 1rem;
+  border-radius: 0.375rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s;
+}
+
+.math-keyboard button:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+/* Стили для карточек формул */
+.formula-card {
+  @apply bg-white dark:bg-slate-800 rounded-lg shadow-lg p-6 mb-4 transition-all duration-200;
+}
+
+.formula-card:hover {
+  @apply shadow-xl transform translate-y-[-2px];
+}
+
+.formula-title {
+  @apply text-xl font-semibold text-slate-900 dark:text-white mb-4;
+}
+
+.formula-description {
+  @apply text-slate-600 dark:text-slate-300 mt-4;
+}
+
+/* Стили для полей ввода */
+.input-field {
+  @apply w-full rounded-lg border border-slate-200 dark:border-slate-700 
+         bg-white dark:bg-slate-900 px-4 py-2 text-slate-900 dark:text-white
+         focus:outline-none focus:ring-2 focus:ring-blue-500;
+}
+
+.textarea-field {
+  @apply w-full rounded-lg border border-slate-200 dark:border-slate-700
+         bg-white dark:bg-slate-900 px-4 py-2 text-slate-900 dark:text-white
+         focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px];
+}
+
+/* Стили для кнопок */
+.button-primary {
+  @apply inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2
+         text-sm font-medium text-white transition-colors hover:bg-slate-700
+         focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2
+         disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900
+         dark:hover:bg-slate-200 dark:focus:ring-slate-400 dark:focus:ring-offset-slate-900;
+}
+
+.button-secondary {
+  @apply inline-flex items-center justify-center rounded-md border border-slate-200
+         bg-transparent px-4 py-2 text-sm font-medium transition-colors
+         hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400
+         focus:ring-offset-2 disabled:opacity-50 dark:border-slate-700
+         dark:text-slate-100 dark:hover:bg-slate-800 dark:hover:text-slate-100
+         dark:focus:ring-slate-400 dark:focus:ring-offset-slate-900;
+}
+
+.button-destructive {
+  @apply inline-flex items-center justify-center rounded-md bg-red-600 px-4 py-2
+         text-sm font-medium text-white transition-colors hover:bg-red-700
+         focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2
+         disabled:opacity-50;
+}
+
+/* Стили для навигации */
+.nav-button {
+  @apply inline-flex items-center justify-center rounded-md px-4 py-2 text-sm
+         font-medium transition-colors hover:bg-slate-100 hover:text-slate-900
+         focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2
+         disabled:opacity-50 dark:hover:bg-slate-800 dark:hover:text-slate-50;
+}
+
+.nav-button.active {
+  @apply bg-slate-900 text-white hover:bg-slate-700 dark:bg-slate-100
+         dark:text-slate-900 dark:hover:bg-slate-200;
+}
+
+/* Стили для предпросмотра */
+.preview-section {
+  @apply mt-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-lg;
+}
+
+/* Стили для скролл-области */
+.scroll-area {
+  @apply rounded-md border border-slate-200 dark:border-slate-700;
+}
+
+.scroll-area-viewport {
+  @apply p-4;
+}
